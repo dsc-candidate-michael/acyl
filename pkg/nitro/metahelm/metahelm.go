@@ -119,12 +119,13 @@ type ChartInstaller struct {
 	k8sgroupbindings map[string]string
 	k8srepowhitelist []string
 	k8ssecretinjs    map[string]config.K8sSecret
+	k8slabels        map[string]string
 }
 
 var _ Installer = &ChartInstaller{}
 
 // NewChartInstaller returns a ChartInstaller configured with an in-cluster K8s clientset
-func NewChartInstaller(ib images.Builder, dl persistence.DataLayer, fs billy.Filesystem, mc metrics.Collector, k8sGroupBindings map[string]string, k8sRepoWhitelist []string, k8sSecretInjs map[string]config.K8sSecret, tcfg TillerConfig, k8sJWTPath string, enableK8sTracing bool) (*ChartInstaller, error) {
+func NewChartInstaller(ib images.Builder, dl persistence.DataLayer, fs billy.Filesystem, mc metrics.Collector, k8sGroupBindings map[string]string, k8sRepoWhitelist []string, k8sSecretInjs map[string]config.K8sSecret, tcfg TillerConfig, k8sJWTPath string, enableK8sTracing bool, k8sLabels map[string]string) (*ChartInstaller, error) {
 	kc, rcfg, err := NewInClusterK8sClientset(k8sJWTPath, enableK8sTracing)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting k8s client")
@@ -141,11 +142,12 @@ func NewChartInstaller(ib images.Builder, dl persistence.DataLayer, fs billy.Fil
 		k8sgroupbindings: k8sGroupBindings,
 		k8srepowhitelist: k8sRepoWhitelist,
 		k8ssecretinjs:    k8sSecretInjs,
+		k8slabels:        k8sLabels,
 	}, nil
 }
 
 // NewChartInstallerWithoutK8sClient returns a ChartInstaller without a k8s client, for use in testing/CLI.
-func NewChartInstallerWithoutK8sClient(ib images.Builder, dl persistence.DataLayer, fs billy.Filesystem, mc metrics.Collector, k8sGroupBindings map[string]string, k8sRepoWhitelist []string, k8sSecretInjs map[string]config.K8sSecret) (*ChartInstaller, error) {
+func NewChartInstallerWithoutK8sClient(ib images.Builder, dl persistence.DataLayer, fs billy.Filesystem, mc metrics.Collector, k8sGroupBindings map[string]string, k8sRepoWhitelist []string, k8sSecretInjs map[string]config.K8sSecret, k8sLabels map[string]string) (*ChartInstaller, error) {
 	return &ChartInstaller{
 		ib:               ib,
 		hcf:              NewInClusterHelmClient,
@@ -155,11 +157,12 @@ func NewChartInstallerWithoutK8sClient(ib images.Builder, dl persistence.DataLay
 		k8sgroupbindings: k8sGroupBindings,
 		k8srepowhitelist: k8sRepoWhitelist,
 		k8ssecretinjs:    k8sSecretInjs,
+		k8slabels:        k8sLabels,
 	}, nil
 }
 
 // NewChartInstallerWithClientsetFromContext returns a ChartInstaller configured with a K8s clientset from the current kubeconfig context
-func NewChartInstallerWithClientsetFromContext(ib images.Builder, dl persistence.DataLayer, fs billy.Filesystem, mc metrics.Collector, k8sGroupBindings map[string]string, k8sRepoWhitelist []string, k8sSecretInjs map[string]config.K8sSecret, tcfg TillerConfig, kubeconfigpath, kubectx string) (*ChartInstaller, error) {
+func NewChartInstallerWithClientsetFromContext(ib images.Builder, dl persistence.DataLayer, fs billy.Filesystem, mc metrics.Collector, k8sGroupBindings map[string]string, k8sRepoWhitelist []string, k8sSecretInjs map[string]config.K8sSecret, tcfg TillerConfig, kubeconfigpath, kubectx string, k8sLabels map[string]string) (*ChartInstaller, error) {
 	kc, rcfg, err := NewKubecfgContextK8sClientset(kubeconfigpath, kubectx)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting k8s client")
@@ -176,6 +179,7 @@ func NewChartInstallerWithClientsetFromContext(ib images.Builder, dl persistence
 		k8sgroupbindings: k8sGroupBindings,
 		k8srepowhitelist: k8sRepoWhitelist,
 		k8ssecretinjs:    k8sSecretInjs,
+		k8slabels:        k8sLabels,
 	}, nil
 }
 
@@ -660,11 +664,6 @@ func (ci ChartInstaller) GenerateCharts(ctx context.Context, ns string, newenv *
 	return out, nil
 }
 
-const (
-	objLabelKey   = "acyl.dev/managed-by"
-	objLabelValue = "nitro"
-)
-
 // createNamespace creates the new namespace, returning the namespace name
 func (ci ChartInstaller) createNamespace(ctx context.Context, envname string) (string, error) {
 	id, err := rand.Int(rand.Reader, big.NewInt(99999))
@@ -677,9 +676,7 @@ func (ci ChartInstaller) createNamespace(ctx context.Context, envname string) (s
 	}
 	ns := corev1.Namespace{
 		ObjectMeta: meta.ObjectMeta{
-			Labels: map[string]string{
-				objLabelKey: objLabelValue,
-			},
+			Labels: ci.k8slabels,
 		},
 	}
 	ns.Name = nsn
@@ -781,10 +778,8 @@ func (ci ChartInstaller) setupNamespace(ctx context.Context, envname, repo, ns s
 		ci.log(ctx, "creating privileged ClusterRoleBinding: %v", clusterRoleBindingName(envname))
 		if _, err := ci.kc.RbacV1().ClusterRoleBindings().Create(&rbacv1.ClusterRoleBinding{
 			ObjectMeta: meta.ObjectMeta{
-				Name: clusterRoleBindingName(envname),
-				Labels: map[string]string{
-					objLabelKey: objLabelValue,
-				},
+				Name:   clusterRoleBindingName(envname),
+				Labels: ci.k8slabels,
 			},
 			Subjects: []rbacv1.Subject{
 				rbacv1.Subject{
@@ -1034,7 +1029,7 @@ func (ci ChartInstaller) removeOrphanedNamespaces(ctx context.Context, maxAge ti
 	if maxAge == 0 {
 		return errors.New("maxAge must be greater than zero")
 	}
-	nsl, err := ci.kc.CoreV1().Namespaces().List(meta.ListOptions{LabelSelector: objLabelKey + "=" + objLabelValue})
+	nsl, err := ci.kc.CoreV1().Namespaces().List(meta.ListOptions{LabelSelector: ci.getLabelSelector()})
 	if err != nil {
 		return errors.Wrap(err, "error listing namespaces")
 	}
@@ -1059,12 +1054,24 @@ func (ci ChartInstaller) removeOrphanedNamespaces(ctx context.Context, maxAge ti
 	return nil
 }
 
+func (ci ChartInstaller) getLabelSelector() string {
+	labelSelector := ""
+	for key, val := range ci.k8slabels {
+		labelSelector += fmt.Sprintf("%v=%v,", key, val)
+	}
+
+	if len(labelSelector) > 0 && labelSelector[len(labelSelector)-1] == ',' {
+		labelSelector = labelSelector[:len(labelSelector)-1]
+	}
+	return labelSelector
+}
+
 // removeOrphanedCRBs removes orphaned ClusterRoleBindings
 func (ci ChartInstaller) removeOrphanedCRBs(ctx context.Context, maxAge time.Duration) error {
 	if maxAge == 0 {
 		return errors.New("maxAge must be greater than zero")
 	}
-	crbl, err := ci.kc.RbacV1().ClusterRoleBindings().List(meta.ListOptions{LabelSelector: objLabelKey + "=" + objLabelValue})
+	crbl, err := ci.kc.RbacV1().ClusterRoleBindings().List(meta.ListOptions{LabelSelector: ci.getLabelSelector()})
 	if err != nil {
 		return errors.Wrap(err, "error listing ClusterRoleBindings")
 	}

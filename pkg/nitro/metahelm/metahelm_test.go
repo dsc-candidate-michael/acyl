@@ -36,6 +36,12 @@ import (
 	rls "k8s.io/helm/pkg/proto/hapi/release"
 )
 
+var testLabelsStr string = "acyl.dev/managed-by=nitro,istio-injection=enabled"
+var testLabels map[string]string = map[string]string{
+	"acyl.dev/managed-by": "nitro",
+	"istio-injection":     "enabled",
+}
+
 func chartMap(charts []metahelm.Chart) map[string]metahelm.Chart {
 	out := map[string]metahelm.Chart{}
 	for _, c := range charts {
@@ -1224,7 +1230,8 @@ func TestMetahelmSetupNamespace(t *testing.T) {
 	k8scfg.ProcessGroupBindings("foo=edit")
 	k8scfg.ProcessPrivilegedRepos("foo/bar")
 	k8scfg.ProcessSecretInjections(&fakeSecretFetcher{}, "mysecret=some/vault/path")
-	ci := ChartInstaller{kc: fkc, dl: dl, k8sgroupbindings: k8scfg.GroupBindings, k8srepowhitelist: k8scfg.PrivilegedRepoWhitelist, k8ssecretinjs: k8scfg.SecretInjections}
+	k8scfg.ProcessLabels(testLabelsStr)
+	ci := ChartInstaller{kc: fkc, dl: dl, k8sgroupbindings: k8scfg.GroupBindings, k8srepowhitelist: k8scfg.PrivilegedRepoWhitelist, k8ssecretinjs: k8scfg.SecretInjections, k8slabels: k8scfg.Labels}
 	if err := ci.setupNamespace(context.Background(), "some-name", "foo/bar", "foo"); err != nil {
 		t.Fatalf("should have succeeded: %v", err)
 	}
@@ -1238,18 +1245,14 @@ func TestMetahelmCleanup(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:              "foo",
 				CreationTimestamp: meta.NewTime(expires),
-				Labels: map[string]string{
-					objLabelKey: objLabelValue,
-				},
+				Labels:            testLabels,
 			},
 		},
 		&v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:              "bar",
 				CreationTimestamp: meta.NewTime(expires),
-				Labels: map[string]string{
-					objLabelKey: objLabelValue,
-				},
+				Labels:            testLabels,
 			},
 		},
 		&v1.Namespace{
@@ -1264,18 +1267,14 @@ func TestMetahelmCleanup(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:              "foo",
 				CreationTimestamp: meta.NewTime(expires),
-				Labels: map[string]string{
-					objLabelKey: objLabelValue,
-				},
+				Labels:            testLabels,
 			},
 		},
 		&rbacv1.ClusterRoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:              "bar",
 				CreationTimestamp: meta.NewTime(expires),
-				Labels: map[string]string{
-					objLabelKey: objLabelValue,
-				},
+				Labels:            testLabels,
 			},
 		},
 		&rbacv1.ClusterRoleBinding{
@@ -1295,8 +1294,9 @@ func TestMetahelmCleanup(t *testing.T) {
 	fkc := fake.NewSimpleClientset(objs...)
 	dl := persistence.NewFakeDataLayer()
 	ci := ChartInstaller{
-		kc: fkc,
-		dl: dl,
+		kc:        fkc,
+		dl:        dl,
+		k8slabels: testLabels,
 	}
 	ci.Cleanup(context.Background(), maxAge)
 	if _, err := fkc.CoreV1().Namespaces().Get("foo", metav1.GetOptions{}); err == nil {
@@ -1343,5 +1343,36 @@ func TestTruncateLongDQAName(t *testing.T) {
 		if output != test.expectedOutput {
 			t.Fatalf("string was truncated incorrectly (%v)", test.input)
 		}
+	}
+}
+
+func TestGetLabelSelector(t *testing.T) {
+	tests := []struct {
+		name                  string
+		labels                map[string]string
+		expectedLabelSelector string
+	}{
+		{
+			name:                  "multiple labels",
+			labels:                testLabels,
+			expectedLabelSelector: testLabelsStr,
+		},
+		{
+			name: "single label",
+			labels: map[string]string{
+				"foo": "bar",
+			},
+			expectedLabelSelector: "foo=bar",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ci := ChartInstaller{k8slabels: tc.labels}
+			labelSelector := ci.getLabelSelector()
+			if labelSelector != tc.expectedLabelSelector {
+				t.Fatalf("getLabelSelector() received unexpected results: %v", labelSelector)
+			}
+		})
 	}
 }

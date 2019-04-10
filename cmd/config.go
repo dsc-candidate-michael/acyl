@@ -51,7 +51,7 @@ var configInfoCmd = &cobra.Command{
 	Use:   "info",
 	Short: "get summary information from an acyl.yml",
 	Long: `Parses, validates and displays summary information about the acyl.yml in the current directory
-(which must be a valid git repo with GitHub remotes). Branch matching will use the currently checked-out branch and the value 
+(which must be a valid git repo with GitHub remotes). Branch matching will use the currently checked-out branch and the value
 passed in for the base-branch flag.
 
 Paths provided by --search-paths will be recursively searched for valid git repositories containing GitHub remotes,
@@ -231,7 +231,7 @@ func configCheck(cmd *cobra.Command, args []string) {
 		perr("error fetching charts: %v", err)
 		return
 	}
-	ci, err := metahelm.NewChartInstallerWithoutK8sClient(nil, nil, osfs.New(""), &metrics.FakeCollector{}, nil, nil, nil)
+	ci, err := metahelm.NewChartInstallerWithoutK8sClient(nil, nil, osfs.New(""), &metrics.FakeCollector{}, nil, nil, nil, nil)
 	if err != nil {
 		perr("error creating chart installer: %v", err)
 		return
@@ -759,7 +759,7 @@ func displayInfoTerminal(rc *models.RepoConfig, err error, mg meta.Getter) int {
 			errorModal("Error Processing Charts", "Check your chart configuration.", err)
 			return
 		}
-		ci, err := metahelm.NewChartInstallerWithoutK8sClient(nil, nil, osfs.New(""), &metrics.FakeCollector{}, nil, nil, nil)
+		ci, err := metahelm.NewChartInstallerWithoutK8sClient(nil, nil, osfs.New(""), &metrics.FakeCollector{}, nil, nil, nil, nil)
 		if err != nil {
 			errorModal("Error Instantiating Chart Installer", "Bug!", err)
 			return

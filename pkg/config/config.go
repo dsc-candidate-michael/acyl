@@ -55,6 +55,10 @@ type K8sConfig struct {
 	PrivilegedRepoWhitelist []string
 	// SecretInjections is a map of secret name to value that will be injected into each environment namespace
 	SecretInjections map[string]K8sSecret
+	// Labels is a map used to store key/value pairs that will be attached to k8s objects that are created by Acyl itself.
+	// Labels should not be empty and should contain a unique combination of labels. These labels can be used by Acyl
+	// to remove orphaned resources.
+	Labels map[string]string
 }
 
 // ProcessPrivilegedRepos takes a comma-separated list of repositories and populates the PrivilegedRepoWhitelist field
@@ -83,6 +87,26 @@ func (kc *K8sConfig) ProcessGroupBindings(gbstr string) error {
 			return fmt.Errorf("empty binding at offset %v: %v", i, gb)
 		}
 		kc.GroupBindings[gbsl[0]] = gbsl[1]
+	}
+	return nil
+}
+
+// ProcessLabels takes a comma-separated list of labels and popultes the Labels field.
+// We want to ensure that at least one label is provided, otherwise, all resources
+// will be managed by Acyl and could be deleted during cleanup. 
+func (kc *K8sConfig) ProcessLabels(labelsStr string) error {
+	kc.Labels = make(map[string]string)
+	labels := strings.Split(labelsStr, ",")
+	if len(labels) == 0 {
+		return fmt.Errorf("at least one label should be provided")
+	}
+	for _, labelStr := range labels {
+		keyValPair := strings.Split(labelStr, "=")
+		if len(keyValPair) != 2 {
+			return fmt.Errorf("malformed label %s in %s", labelStr, labelsStr)
+		}
+		key, value := keyValPair[0], keyValPair[1]
+		kc.Labels[key] = value
 	}
 	return nil
 }

@@ -46,6 +46,7 @@ func init() {
 	integrationCmd.Flags().StringVar(&integrationcfg.dataFile, "data-file", "testdata/integration/data.json", "path to JSON data file")
 	integrationCmd.Flags().StringVar(&integrationcfg.webhookFile, "webhook-file", "testdata/integration/webhook.json", "path to JSON webhook file")
 	integrationCmd.Flags().StringVar(&integrationcfg.githubToken, "github-token", os.Getenv("GITHUB_TOKEN"), "GitHub access token")
+	integrationCmd.PersistentFlags().StringVar(&k8sLabelsStr, "k8s-labels", "acyl.dev/managed-by=nitro,istio-injection=enabled", "comma-separated list of key/value pairs in the form <key1>=<value1>,<key2>=<value2>. Note: The combination of labels should be unique in the cluster")
 	RootCmd.AddCommand(integrationCmd)
 }
 
@@ -165,7 +166,11 @@ func setupNitro(dl persistence.DataLayer) (spawner.EnvironmentSpawner, ghclient.
 	fs := osfs.New("")
 	mg := &meta.DataGetter{RC: rc, FS: fs}
 	ib := &images.FakeImageBuilder{BatchCompletedFunc: func(envname, repo string) (bool, error) { return true, nil }}
-	ci, err := metahelm.NewChartInstaller(ib, dl, fs, mc, map[string]string{}, []string{}, map[string]config.K8sSecret{}, metahelm.TillerConfig{}, k8sClientConfig.JWTPath, false)
+	err := k8sConfig.ProcessLabels(k8sLabelsStr)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "error in k8s labels")
+	}
+	ci, err := metahelm.NewChartInstaller(ib, dl, fs, mc, map[string]string{}, []string{}, map[string]config.K8sSecret{}, metahelm.TillerConfig{}, k8sClientConfig.JWTPath, false, k8sConfig.Labels)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "error getting metahelm chart installer")
 	}
