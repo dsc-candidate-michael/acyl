@@ -51,7 +51,7 @@ var backendConfig config.BackendConfig
 var aminoConfig config.AminoConfig
 
 var k8sConfig config.K8sConfig
-var k8sGroupBindingsStr, k8sSecretsStr, k8sPrivilegedReposStr, k8sLabelsStr string
+var k8sGroupBindingsStr, k8sSecretsStr, k8sPrivilegedReposStr string
 
 var pgConfig config.PGConfig
 var logger *log.Logger
@@ -105,7 +105,6 @@ func init() {
 	serverCmd.PersistentFlags().StringVar(&k8sGroupBindingsStr, "k8s-group-bindings", "", "optional k8s RBAC group bindings (comma-separated) for new environment namespaces in GROUP1=CLUSTER_ROLE1,GROUP2=CLUSTER_ROLE2 format (ex: users=edit) (Nitro)")
 	serverCmd.PersistentFlags().StringVar(&k8sSecretsStr, "k8s-secret-injections", "", "optional k8s secret injections (comma-separated) for new environment namespaces in SECRET_NAME=VAULT_ID (Vault path using secrets mapping) format. Secret value in Vault must be a JSON-encoded object with two keys: 'data' (map of string to base64-encoded bytes), 'type' (string). (Nitro)")
 	serverCmd.PersistentFlags().StringVar(&k8sPrivilegedReposStr, "k8s-privileged-repo-whitelist", "dollarshaveclub/acyl", "optional comma-separated whitelist of GitHub repositories whose environment service accounts will be allowed cluster-admin privileges (Nitro)")
-	serverCmd.PersistentFlags().StringVar(&k8sLabelsStr, "k8s-labels", "acyl.dev/managed-by=nitro,istio-injection=enabled", "comma-separated list of key/value pairs in the form <key1>=<value1>,<key2>=<value2>. Note: The combination of labels should be unique in the cluster")
 	serverCmd.PersistentFlags().StringVar(&failureTemplatePath, "failure-template-path", "/opt/html/failedenv.html.tmpl", "path to HTML failure report template (if missing, failure reports will be disabled")
 	serverCmd.PersistentFlags().StringVar(&s3config.Region, "failure-report-s3-region", "us-west-2", "AWS S3 region for environment failure reports")
 	serverCmd.PersistentFlags().StringVar(&s3config.Bucket, "failure-report-s3-bucket", "", "AWS S3 bucket for environment failure reports")
@@ -211,9 +210,6 @@ func server(cmd *cobra.Command, args []string) {
 		}
 		if err := k8sConfig.ProcessGroupBindings(k8sGroupBindingsStr); err != nil {
 			log.Fatalf("error in k8s group bindings: %v", err)
-		}
-		if err := k8sConfig.ProcessLabels(k8sLabelsStr); err != nil {
-			log.Fatalf("error in k8s labels: %v", err)
 		}
 		sc, err := getSecretClient()
 		if err != nil {

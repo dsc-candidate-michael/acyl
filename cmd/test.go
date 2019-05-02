@@ -121,7 +121,7 @@ func init() {
 	configTestCmd.PersistentFlags().BoolVar(&testEnvCfg.privileged, "privileged", false, "give the environment service account ClusterAdmin privileges via a ClusterRoleBinding (use this if your application requires ClusterAdmin abilities)")
 	configTestCmd.PersistentFlags().StringVar(&k8sGroupBindingsStr, "k8s-group-bindings", "", "optional k8s RBAC group bindings for the environment namespace (comma-separated) in GROUP1=CLUSTER_ROLE1,GROUP2=CLUSTER_ROLE2 format (ex: users=edit)")
 	configTestCmd.PersistentFlags().StringVar(&k8sSecretsStr, "k8s-secret-injections", "", "optional k8s secret injections (comma-separated) for new environment namespaces (other than image-pull-secret) in SECRET_NAME=VAULT_ID (Vault path using secrets mapping) format. Secret value in Vault must be a JSON-encoded object with two keys: 'data' (map of string to base64-encoded bytes), 'type' (string).")
-	configTestCmd.PersistentFlags().StringVar(&k8sLabelsStr, "k8s-labels", "acyl.dev/managed-by=nitro,istio-injection=enabled", "comma-separated list of key/value pairs in the form <key1>=<value1>,<key2>=<value2>. Note: The combination of labels should be unique in the cluster")
+	configTestCmd.PersistentFlags().StringVar(&k8sLabelsStr, "k8s-labels", "acyl.dev/managed-by=nitro", "comma-separated list of key/value pairs in the form <key1>=<value1>,<key2>=<value2>. Note: The combination of labels should be unique in the cluster")
 	wd, err := os.Getwd()
 	if err != nil {
 		log.Printf("error getting working directory: %v", err)

@@ -18,11 +18,17 @@ var awsConfig config.AWSConfig
 var secretsConfig config.SecretsConfig
 var secretsbackend string
 var k8sClientConfig config.K8sClientConfig
+var k8sLabelsStr string
 
 var RootCmd = &cobra.Command{
 	Use:   "acyl",
 	Short: "Dynamic Environment System",
 	Long:  `Dynamic environment server API and client utility`,
+	PreRun: func(cmd *cobra.Command, args []string) {
+		if err := k8sConfig.ProcessLabels(k8sLabelsStr); err != nil {
+			clierr("error in k8s labels: %v", err)
+		}
+	},
 }
 
 //shorthands in use by register: i p r m o
@@ -42,6 +48,7 @@ func init() {
 	RootCmd.PersistentFlags().StringVar(&secretsbackend, "secrets-backend", "vault", "Secret backend (one of: vault,env)")
 	RootCmd.PersistentFlags().StringVar(&secretsConfig.Mapping, "secrets-mapping", "", "Secrets mapping template string (required)")
 	RootCmd.PersistentFlags().StringVar(&k8sClientConfig.JWTPath, "k8s-jwt-path", "/var/run/secrets/kubernetes.io/serviceaccount/token", "Path to the JWT used to authenticate the k8s client to the API server")
+	RootCmd.PersistentFlags().StringVar(&k8sLabelsStr, "k8s-labels", "acyl.dev/managed-by=nitro", "comma-separated list of key/value pairs in the form <key1>=<value1>,<key2>=<value2>. Note: The combination of labels should be unique in the cluster")
 }
 
 func clierr(msg string, params ...interface{}) {

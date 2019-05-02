@@ -40,7 +40,6 @@ var k8sMaxage, destroyedenvsMaxage, eventlogsMaxage time.Duration
 func init() {
 	cleanupCmd.Flags().DurationVar(&k8sMaxage, "k8s-objs-max-age", 14*24*time.Hour, "Maximum age for orphaned k8s objects")
 	cleanupCmd.Flags().DurationVar(&destroyedenvsMaxage, "destroyed-envs-max-age", 30*24*time.Hour, "Maximum age for destroyed environment DB records")
-	cleanupCmd.PersistentFlags().StringVar(&k8sLabelsStr, "k8s-labels", "acyl.dev/managed-by=nitro,istio-injection=enabled", "comma-separated list of key/value pairs in the form <key1>=<value1>,<key2>=<value2>. Note: The combination of labels should be unique in the cluster")
 	RootCmd.AddCommand(cleanupCmd)
 }
 
@@ -76,8 +75,6 @@ func cleanup(cmd *cobra.Command, args []string) {
 	}
 
 	cleaner.Clean()
-	// Todo: Looks like we may want to process the other k8sConfig values as well
-	err = k8sConfig.ProcessLabels(k8sLabelsStr)
 	if err != nil {
 		log.Fatalf("error in k8s labels: %v", err)
 	}
