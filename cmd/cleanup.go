@@ -40,6 +40,7 @@ var k8sMaxage, destroyedenvsMaxage, eventlogsMaxage time.Duration
 func init() {
 	cleanupCmd.Flags().DurationVar(&k8sMaxage, "k8s-objs-max-age", 14*24*time.Hour, "Maximum age for orphaned k8s objects")
 	cleanupCmd.Flags().DurationVar(&destroyedenvsMaxage, "destroyed-envs-max-age", 30*24*time.Hour, "Maximum age for destroyed environment DB records")
+	cleanupCmd.Flags().DurationVar(&eventlogsMaxage, "event-logs-max-age", 30*24*time.Hour, "Maximum age for event log DB records")
 	RootCmd.AddCommand(cleanupCmd)
 }
 
