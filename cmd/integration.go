@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/dollarshaveclub/acyl/pkg/config"
 	"github.com/dollarshaveclub/acyl/pkg/ghclient"
 	"github.com/dollarshaveclub/acyl/pkg/ghevent"
 	"github.com/dollarshaveclub/acyl/pkg/locker"
@@ -165,7 +164,15 @@ func setupNitro(dl persistence.DataLayer) (spawner.EnvironmentSpawner, ghclient.
 	fs := osfs.New("")
 	mg := &meta.DataGetter{RC: rc, FS: fs}
 	ib := &images.FakeImageBuilder{BatchCompletedFunc: func(envname, repo string) (bool, error) { return true, nil }}
-	ci, err := metahelm.NewChartInstaller(ib, dl, fs, mc, map[string]string{}, []string{}, map[string]config.K8sSecret{}, metahelm.TillerConfig{}, k8sClientConfig.JWTPath, false, k8sConfig.Labels)
+	ci, err := metahelm.NewChartInstaller(metahelm.ChartInstallerConfig{
+		ImageBuilder:     ib,
+		DataLayer:        dl,
+		Filesystem:       fs,
+		MetricsCollector: mc,
+		TillerConfig:     metahelm.TillerConfig{},
+		K8sJWTPath:       k8sClientConfig.JWTPath,
+		K8sLabels:        k8sConfig.Labels,
+	})
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "error getting metahelm chart installer")
 	}

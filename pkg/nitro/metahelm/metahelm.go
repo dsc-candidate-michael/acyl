@@ -105,12 +105,27 @@ func (tcfg TillerConfig) SetDefaults() TillerConfig {
 	return out
 }
 
+// ChartInstallerConfig is a struct that configures a ChartInstaller
+type ChartInstallerConfig struct {
+	ImageBuilder        images.Builder
+	TillerConfig        TillerConfig
+	DataLayer           persistence.DataLayer
+	Filesystem          billy.Filesystem
+	MetricsCollector    metrics.Collector
+	K8sGroupBindings    map[string]string
+	K8sRepoWhiteList    []string
+	K8sSecretInjections map[string]config.K8sSecret
+	K8sJWTPath          string
+	EnableK8sTracing    bool
+	K8sLabels           map[string]string
+}
+
 // ChartInstaller is an object that manages namespaces and install/upgrades/deletes metahelm chart graphs
+// TODO(mk): Consider replacing most attributes with a single ChartInstallerConfig
 type ChartInstaller struct {
 	ib               images.Builder
 	kc               kubernetes.Interface
 	rcfg             *rest.Config
-	kcf              K8sClientFactoryFunc
 	hcf              HelmClientFactoryFunc
 	tcfg             TillerConfig
 	dl               persistence.DataLayer
@@ -125,61 +140,61 @@ type ChartInstaller struct {
 var _ Installer = &ChartInstaller{}
 
 // NewChartInstaller returns a ChartInstaller configured with an in-cluster K8s clientset
-func NewChartInstaller(ib images.Builder, dl persistence.DataLayer, fs billy.Filesystem, mc metrics.Collector, k8sGroupBindings map[string]string, k8sRepoWhitelist []string, k8sSecretInjs map[string]config.K8sSecret, tcfg TillerConfig, k8sJWTPath string, enableK8sTracing bool, k8sLabels map[string]string) (*ChartInstaller, error) {
-	kc, rcfg, err := NewInClusterK8sClientset(k8sJWTPath, enableK8sTracing)
+func NewChartInstaller(config ChartInstallerConfig) (*ChartInstaller, error) {
+	kc, rcfg, err := NewInClusterK8sClientset(config.K8sJWTPath, config.EnableK8sTracing)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting k8s client")
 	}
 	return &ChartInstaller{
-		ib:               ib,
+		ib:               config.ImageBuilder,
 		kc:               kc,
 		rcfg:             rcfg,
 		hcf:              NewInClusterHelmClient,
-		tcfg:             tcfg.SetDefaults(),
-		dl:               dl,
-		fs:               fs,
-		mc:               mc,
-		k8sgroupbindings: k8sGroupBindings,
-		k8srepowhitelist: k8sRepoWhitelist,
-		k8ssecretinjs:    k8sSecretInjs,
-		k8slabels:        k8sLabels,
+		tcfg:             config.TillerConfig.SetDefaults(),
+		dl:               config.DataLayer,
+		fs:               config.Filesystem,
+		mc:               config.MetricsCollector,
+		k8sgroupbindings: config.K8sGroupBindings,
+		k8srepowhitelist: config.K8sRepoWhiteList,
+		k8ssecretinjs:    config.K8sSecretInjections,
+		k8slabels:        config.K8sLabels,
 	}, nil
 }
 
 // NewChartInstallerWithoutK8sClient returns a ChartInstaller without a k8s client, for use in testing/CLI.
-func NewChartInstallerWithoutK8sClient(ib images.Builder, dl persistence.DataLayer, fs billy.Filesystem, mc metrics.Collector, k8sGroupBindings map[string]string, k8sRepoWhitelist []string, k8sSecretInjs map[string]config.K8sSecret, k8sLabels map[string]string) (*ChartInstaller, error) {
+func NewChartInstallerWithoutK8sClient(config ChartInstallerConfig) (*ChartInstaller, error) {
 	return &ChartInstaller{
-		ib:               ib,
+		ib:               config.ImageBuilder,
 		hcf:              NewInClusterHelmClient,
-		dl:               dl,
-		fs:               fs,
-		mc:               mc,
-		k8sgroupbindings: k8sGroupBindings,
-		k8srepowhitelist: k8sRepoWhitelist,
-		k8ssecretinjs:    k8sSecretInjs,
-		k8slabels:        k8sLabels,
+		dl:               config.DataLayer,
+		fs:               config.Filesystem,
+		mc:               config.MetricsCollector,
+		k8sgroupbindings: config.K8sGroupBindings,
+		k8srepowhitelist: config.K8sRepoWhiteList,
+		k8ssecretinjs:    config.K8sSecretInjections,
+		k8slabels:        config.K8sLabels,
 	}, nil
 }
 
 // NewChartInstallerWithClientsetFromContext returns a ChartInstaller configured with a K8s clientset from the current kubeconfig context
-func NewChartInstallerWithClientsetFromContext(ib images.Builder, dl persistence.DataLayer, fs billy.Filesystem, mc metrics.Collector, k8sGroupBindings map[string]string, k8sRepoWhitelist []string, k8sSecretInjs map[string]config.K8sSecret, tcfg TillerConfig, kubeconfigpath, kubectx string, k8sLabels map[string]string) (*ChartInstaller, error) {
+func NewChartInstallerWithClientsetFromContext(config ChartInstallerConfig, kubeconfigpath, kubectx string) (*ChartInstaller, error) {
 	kc, rcfg, err := NewKubecfgContextK8sClientset(kubeconfigpath, kubectx)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting k8s client")
 	}
 	return &ChartInstaller{
-		ib:               ib,
+		ib:               config.ImageBuilder,
 		kc:               kc,
 		rcfg:             rcfg,
 		hcf:              NewTunneledHelmClient,
-		tcfg:             tcfg.SetDefaults(),
-		dl:               dl,
-		fs:               fs,
-		mc:               mc,
-		k8sgroupbindings: k8sGroupBindings,
-		k8srepowhitelist: k8sRepoWhitelist,
-		k8ssecretinjs:    k8sSecretInjs,
-		k8slabels:        k8sLabels,
+		tcfg:             config.TillerConfig.SetDefaults(),
+		dl:               config.DataLayer,
+		fs:               config.Filesystem,
+		mc:               config.MetricsCollector,
+		k8sgroupbindings: config.K8sGroupBindings,
+		k8srepowhitelist: config.K8sRepoWhiteList,
+		k8ssecretinjs:    config.K8sSecretInjections,
+		k8slabels:        config.K8sLabels,
 	}, nil
 }
 

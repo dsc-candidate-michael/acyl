@@ -93,7 +93,7 @@ func (kc *K8sConfig) ProcessGroupBindings(gbstr string) error {
 
 // ProcessLabels takes a comma-separated list of labels and popultes the Labels field.
 // We want to ensure that at least one label is provided, otherwise, all resources
-// will be managed by Acyl and could be deleted during cleanup. 
+// will be managed by Acyl and could be deleted during cleanup.
 func (kc *K8sConfig) ProcessLabels(labelsStr string) error {
 	kc.Labels = make(map[string]string)
 	labels := strings.Split(labelsStr, ",")

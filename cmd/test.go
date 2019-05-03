@@ -359,7 +359,17 @@ func testConfigSetup() (*nitroenv.Manager, context.Context, *models.RepoRevision
 		ServerConnectRetries:    10,
 		ServerConnectRetryDelay: 2 * time.Second,
 	}
-	ci, err := metahelm.NewChartInstallerWithClientsetFromContext(ib, dl, fs, mc, testEnvCfg.k8sCfg.GroupBindings, k8sConfig.PrivilegedRepoWhitelist, testEnvCfg.k8sCfg.SecretInjections, tcfg, testEnvCfg.kubeCfgPath, testEnvCfg.kubeCtx, testEnvCfg.k8sCfg.Labels)
+	ci, err := metahelm.NewChartInstallerWithClientsetFromContext(metahelm.ChartInstallerConfig{
+		ImageBuilder:        ib,
+		DataLayer:           dl,
+		Filesystem:          fs,
+		MetricsCollector:    mc,
+		K8sGroupBindings:    testEnvCfg.k8sCfg.GroupBindings,
+		K8sRepoWhiteList:    k8sConfig.PrivilegedRepoWhitelist, // TODO: Should this be using testEnvCfg? Left as is to maintain current behavior
+		K8sSecretInjections: testEnvCfg.k8sCfg.SecretInjections,
+		TillerConfig:        tcfg,
+		K8sLabels:           testEnvCfg.k8sCfg.Labels,
+	}, testEnvCfg.kubeCfgPath, testEnvCfg.kubeCtx)
 	if err != nil {
 		return nil, nil, nil, errors.Wrap(err, "error getting chart installer")
 	}
